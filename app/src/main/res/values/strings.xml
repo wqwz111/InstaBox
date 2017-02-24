@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">InstaBox</string>
+
+    <string name="notification_title">Now downloading…</string>
+    <string name="notification_description">File Name:</string>
+    <string name="empty_text">Copy Share Link From Instagram To Download Media</string>
+    <string name="title_activity_settings">Settings</string>
+</resources>
