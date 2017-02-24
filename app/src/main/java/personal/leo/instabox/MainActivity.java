@@ -18,6 +18,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.AsyncTaskLoader;
@@ -48,6 +49,9 @@ public class MainActivity extends AppCompatActivity
     private ArrayList<Long> mDownloadIds = new ArrayList<>();
     private static MediaAdapter mMediaAdapter;
 
+
+    private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 0;
+
     private static final String PREFERENCES_NAME = "settings";
     private static final String PREF_KEY_NETWORK = "network";
     private static final String PREF_KEY_AUTO_DOWNLOAD = "auto_download";
@@ -57,15 +61,12 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mProgressBar = (ProgressBar) findViewById(R.id.pb_loading_media);
-        mProgressBar.setVisibility(View.VISIBLE);
         mGridView = (GridView) findViewById(R.id.gv_main);
         mMediaAdapter = new MediaAdapter(this);
         mGridView.setAdapter(mMediaAdapter);
         mGridView.setOnItemClickListener(onItemClick);
 
         mSettings = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
-
-        requestPermission();
         registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         LocalBroadcastManager.getInstance(this)
                 .registerReceiver(myReciver, new IntentFilter(Constants.BROADCAST_ACTION));
@@ -77,8 +78,11 @@ public class MainActivity extends AppCompatActivity
         if (hasPermission()) {
             getSupportLoaderManager().initLoader(0, null, MainActivity.this);
             if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
+                mProgressBar.setVisibility(View.VISIBLE);
                 fetchRemoteMediaInfo();
             }
+        } else {
+            requestPermission();
         }
     }
 
@@ -105,6 +109,19 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        if (requestCode == PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE) {
+            if ((grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_DENIED)
+                    || grantResults.length == 0) {
+                finish();
+            }
+        }
+    }
+
     private void showSettingsDialog() {
         SettingsDialogFragment settingsDialogFragment = new SettingsDialogFragment();
         settingsDialogFragment.show(getSupportFragmentManager(), "settings");
@@ -119,13 +136,9 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void requestPermission() {
-        if (!hasPermission()) {
-            int PERMISSIONS_REQUEST_READ_WRITE_EXTERNAL_STORAGE = 0;
-            ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                            Manifest.permission.READ_EXTERNAL_STORAGE},
-                    PERMISSIONS_REQUEST_READ_WRITE_EXTERNAL_STORAGE);
-        }
+        ActivityCompat.requestPermissions(MainActivity.this,
+                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
     }
 
     private BroadcastReceiver myReciver = new BroadcastReceiver() {

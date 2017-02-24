@@ -23,7 +23,6 @@
         <service
             android:name=".DownloaderService"
             android:exported="false" />
-
     </application>
 
 </manifest>
