@@ -9,6 +9,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -24,6 +25,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.Loader;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.GridView;
@@ -37,12 +40,17 @@ import java.util.Comparator;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity
-        implements LoaderManager.LoaderCallbacks<List<MediaInfo>>{
+        implements LoaderManager.LoaderCallbacks<List<MediaInfo>>,
+        SettingsDialogFragment.SettingsDialogListener{
     private GridView mGridView;
     private ProgressBar mProgressBar;
+    private SharedPreferences mSettings;
     private ArrayList<Long> mDownloadIds = new ArrayList<>();
     private static MediaAdapter mMediaAdapter;
-    private final int PERMISSIONS_REQUEST_READ_WRITE_EXTERNAL_STORAGE = 0;
+
+    private static final String PREFERENCES_NAME = "settings";
+    private static final String PREF_KEY_NETWORK = "network";
+    private static final String PREF_KEY_AUTO_DOWNLOAD = "auto_download";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +63,8 @@ public class MainActivity extends AppCompatActivity
         mGridView.setAdapter(mMediaAdapter);
         mGridView.setOnItemClickListener(onItemClick);
 
+        mSettings = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
+
         requestPermission();
         registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         LocalBroadcastManager.getInstance(this)
@@ -66,12 +76,8 @@ public class MainActivity extends AppCompatActivity
         super.onResume();
         if (hasPermission()) {
             getSupportLoaderManager().initLoader(0, null, MainActivity.this);
-            ClipboardManager clipboardManager =
-                    (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-            String url = clipboardManager.hasPrimaryClip() ?
-                    clipboardManager.getPrimaryClip().getItemAt(0).getText().toString() : "";
-            if (!url.isEmpty() && url.matches("^https://www[.]instagram[.]com/p/.*/$")) {
-                DownloaderService.startActionFoo(this, url);
+            if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
+                fetchRemoteMediaInfo();
             }
         }
     }
@@ -83,11 +89,25 @@ public class MainActivity extends AppCompatActivity
         super.onDestroy();
     }
 
-    private boolean doesFileExist(String fileName) {
-        File file = new File(Environment
-                .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
-                + File.separator + fileName);
-        return file.exists();
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_item_settings: {
+                showSettingsDialog();
+            }
+        }
+        return true;
+    }
+
+    private void showSettingsDialog() {
+        SettingsDialogFragment settingsDialogFragment = new SettingsDialogFragment();
+        settingsDialogFragment.show(getSupportFragmentManager(), "settings");
     }
 
     private boolean hasPermission() {
@@ -100,6 +120,7 @@ public class MainActivity extends AppCompatActivity
 
     private void requestPermission() {
         if (!hasPermission()) {
+            int PERMISSIONS_REQUEST_READ_WRITE_EXTERNAL_STORAGE = 0;
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
                             Manifest.permission.READ_EXTERNAL_STORAGE},
@@ -113,9 +134,7 @@ public class MainActivity extends AppCompatActivity
             ContentValues contentValues = intent.getParcelableExtra(Constants.MEDIA_INFO);
             String mediaUrl = contentValues.getAsString(Constants.MEDIA_URL);
             String mediaName = contentValues.getAsString(Constants.MEDIA_NAME);
-            if (!doesFileExist(mediaName)) {
-                download(mediaUrl,mediaName);
-            }
+            download(mediaUrl, mediaName);
         }
     };
 
@@ -146,14 +165,31 @@ public class MainActivity extends AppCompatActivity
     };
 
     private void download(String url, String fileName) {
-        Request request = new Request(Uri.parse(url));
-        request.setTitle(fileName);
-        request.setNotificationVisibility(Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+        File file = new File(Environment
+                .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
+                + File.separator + fileName);
+        if (!file.exists()) {
+            boolean allowedOverMetered = mSettings.getBoolean(PREF_KEY_NETWORK, true);
+            Request request = new Request(Uri.parse(url));
+            request.setTitle(fileName);
+            request.setNotificationVisibility(Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            request.setAllowedOverMetered(allowedOverMetered);
 
-        DownloadManager mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        long id = mDownloadManager.enqueue(request);
-        mDownloadIds.add(id);
+            DownloadManager mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            long id = mDownloadManager.enqueue(request);
+            mDownloadIds.add(id);
+        }
+    }
+
+    private void fetchRemoteMediaInfo() {
+        ClipboardManager clipboardManager =
+                (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        String url = clipboardManager.hasPrimaryClip() ?
+                clipboardManager.getPrimaryClip().getItemAt(0).getText().toString() : "";
+        if (!url.isEmpty() && url.matches("^https://www[.]instagram[.]com/p/.*/$")) {
+            DownloaderService.startActionFoo(this, url);
+        }
     }
 
     @Override
@@ -176,6 +212,18 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onLoaderReset(Loader<List<MediaInfo>> loader) {
         mMediaAdapter.clear();
+    }
+
+    @Override
+    public void onDismiss(boolean allowedOverMetered, boolean allowedAutoDownload) {
+        SharedPreferences.Editor editor = mSettings.edit();
+        editor.putBoolean(PREF_KEY_AUTO_DOWNLOAD, allowedAutoDownload);
+        editor.putBoolean(PREF_KEY_NETWORK, allowedOverMetered);
+        editor.apply();
+    }
+
+    public void onFabDownloadClick(View view) {
+        fetchRemoteMediaInfo();
     }
 
     static class MediaLoader extends AsyncTaskLoader<List<MediaInfo>> {

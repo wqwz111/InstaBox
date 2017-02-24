@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/activity_main"
     android:layout_width="match_parent"
@@ -39,4 +40,18 @@
         android:indeterminate="true"
         android:visibility="gone"
         android:id="@+id/pb_loading_media"/>
+
+    <android.support.design.widget.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="@dimen/fab_download_margin_bottom"
+        android:layout_marginEnd="@dimen/fab_download_margin_end"
+        android:clickable="true"
+        app:fabSize="mini"
+        app:srcCompat="@android:drawable/stat_sys_download"
+        android:onClick="onFabDownloadClick"
+        android:id="@+id/fab_download" />
+
 </RelativeLayout>
