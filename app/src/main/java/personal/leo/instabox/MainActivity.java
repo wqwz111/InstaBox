@@ -78,7 +78,6 @@ public class MainActivity extends AppCompatActivity
         if (hasPermission()) {
             getSupportLoaderManager().initLoader(0, null, MainActivity.this);
             if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
-                mProgressBar.setVisibility(View.VISIBLE);
                 fetchRemoteMediaInfo();
             }
         } else {
@@ -207,7 +206,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public Loader<List<MediaInfo>> onCreateLoader(int id, Bundle args) {
-        return new MediaLoader(MainActivity.this);
+        return new MediaLoader(MainActivity.this, mProgressBar);
     }
 
     @Override
@@ -241,12 +240,16 @@ public class MainActivity extends AppCompatActivity
 
     static class MediaLoader extends AsyncTaskLoader<List<MediaInfo>> {
 
-        MediaLoader(Context context) {
+        private ProgressBar mProgressBar;
+
+        MediaLoader(Context context, ProgressBar progressBar) {
             super(context);
+            mProgressBar = progressBar;
         }
 
         @Override
         protected void onStartLoading() {
+            mProgressBar.setVisibility(View.VISIBLE);
             forceLoad();
         }
 
