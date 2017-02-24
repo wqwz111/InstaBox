@@ -41,7 +41,7 @@ import java.util.Comparator;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity
-        implements LoaderManager.LoaderCallbacks<List<MediaInfo>>,
+        implements LoaderManager.LoaderCallbacks<File[]>,
         SettingsDialogFragment.SettingsDialogListener{
     private GridView mGridView;
     private ProgressBar mProgressBar;
@@ -164,8 +164,8 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
             Intent intent = new Intent(Intent.ACTION_VIEW);
-            MediaInfo mediaInfo = (MediaInfo) adapterView.getItemAtPosition(i);
-            String filePath = mediaInfo.getFilePath();
+            File file = (File) adapterView.getItemAtPosition(i);
+            String filePath = file.getPath();
             if (Utils.isVideo(filePath)) {
                 intent.setDataAndType(Uri.fromFile(new File(filePath)),
                         "video/*");
@@ -205,24 +205,23 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public Loader<List<MediaInfo>> onCreateLoader(int id, Bundle args) {
+    public Loader<File[]> onCreateLoader(int id, Bundle args) {
         return new MediaLoader(MainActivity.this, mProgressBar);
     }
 
     @Override
-    public void onLoadFinished(Loader<List<MediaInfo>> loader, List<MediaInfo> data) {
+    public void onLoadFinished(Loader<File[]> loader, File[] data) {
         mProgressBar.setVisibility(View.GONE);
         mMediaAdapter.clear();
-        if (data.isEmpty()) {
+        if (data == null || data.length == 0) {
             mGridView.setEmptyView(findViewById(R.id.tv_empty));
         } else {
             mMediaAdapter.addAll(data);
-            mGridView.smoothScrollToPosition(0);
         }
     }
 
     @Override
-    public void onLoaderReset(Loader<List<MediaInfo>> loader) {
+    public void onLoaderReset(Loader<File[]> loader) {
         mMediaAdapter.clear();
     }
 
@@ -238,7 +237,7 @@ public class MainActivity extends AppCompatActivity
         fetchRemoteMediaInfo();
     }
 
-    static class MediaLoader extends AsyncTaskLoader<List<MediaInfo>> {
+    static class MediaLoader extends AsyncTaskLoader<File[]> {
 
         private ProgressBar mProgressBar;
 
@@ -259,8 +258,7 @@ public class MainActivity extends AppCompatActivity
         }
 
         @Override
-        public List<MediaInfo> loadInBackground() {
-            List<MediaInfo> mediaInfos = new ArrayList<>();
+        public File[] loadInBackground() {
             File[] files = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                     .listFiles(new FilenameFilter() {
                         @Override
@@ -270,15 +268,8 @@ public class MainActivity extends AppCompatActivity
                     });
             if (files != null && files.length != 0) {
                 sortFilesByLastModifiedTime(files);
-                for (File file : files) {
-                    String filePath = file.getPath();
-                    Bitmap bitmap = generateBitmap(filePath);
-                    MediaInfo mediaInfo = new MediaInfo(bitmap, filePath);
-                    mediaInfos.add(mediaInfo);
-                }
             }
-
-            return mediaInfos;
+            return files;
         }
 
         private void sortFilesByLastModifiedTime(File[] files) {
@@ -286,26 +277,14 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public int compare(File lhs, File rhs) {
                     if (lhs.lastModified() < rhs.lastModified()) {
-                        return 1;
-                    } else if (lhs.lastModified() > rhs.lastModified()) {
                         return -1;
+                    } else if (lhs.lastModified() > rhs.lastModified()) {
+                        return 1;
                     } else {
                         return 0;
                     }
                 }
             });
         }
-    }
-
-    private static Bitmap generateBitmap(String filePath) {
-        Bitmap bitmap;
-        if (Utils.isVideo(filePath)) {
-            bitmap = ThumbnailUtils.createVideoThumbnail(filePath,
-                    MediaStore.Video.Thumbnails.MINI_KIND);
-        } else {
-            bitmap = BitmapFactory.decodeFile(filePath);
-
-        }
-        return bitmap;
     }
 }
