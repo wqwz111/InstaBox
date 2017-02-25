@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -34,6 +35,9 @@ import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+
+import static android.app.DownloadManager.Request.NETWORK_MOBILE;
+import static android.app.DownloadManager.Request.NETWORK_WIFI;
 
 public class MainActivity extends AppCompatActivity
         implements LoaderManager.LoaderCallbacks<File[]>,
@@ -172,21 +176,41 @@ public class MainActivity extends AppCompatActivity
     };
 
     private void download(String url, String fileName) {
-        File file = new File(Environment
-                .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()
-                + File.separator + fileName);
-        if (!file.exists()) {
+        DownloadManager mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        if (!doesRequestExist(mDownloadManager, url)) {
             boolean allowedOverMetered = mSettings.getBoolean(PREF_KEY_NETWORK, true);
+            int networkType = NETWORK_WIFI;
+            if (allowedOverMetered) {
+                networkType = NETWORK_WIFI | NETWORK_MOBILE;
+            }
             Request request = new Request(Uri.parse(url));
             request.setTitle(fileName);
             request.setNotificationVisibility(Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-            request.setAllowedOverMetered(allowedOverMetered);
+            request.setAllowedNetworkTypes(networkType);
 
-            DownloadManager mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
             long id = mDownloadManager.enqueue(request);
             mDownloadIds.add(id);
         }
+    }
+
+    private boolean doesRequestExist(DownloadManager downloadManager, String url) {
+        boolean result = false;
+        DownloadManager.Query query = new DownloadManager.Query();
+        query.setFilterByStatus(DownloadManager.STATUS_SUCCESSFUL
+            | DownloadManager.STATUS_PENDING
+            | DownloadManager.STATUS_RUNNING);
+        Cursor cursor = downloadManager.query(query);
+        while (cursor.moveToNext()) {
+            int uriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_URI);
+            String uri = cursor.getString(uriIndex);
+            if (uri.equals(url)) {
+                result = true;
+                break;
+            }
+        }
+        cursor.close();
+        return result;
     }
 
     private void fetchRemoteMediaInfo() {
