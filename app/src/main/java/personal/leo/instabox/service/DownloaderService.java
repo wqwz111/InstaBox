@@ -1,4 +1,4 @@
-package personal.leo.instabox;
+package personal.leo.instabox.service;
 
 import android.app.IntentService;
 import android.content.ContentValues;
@@ -10,6 +10,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 import java.io.IOException;
+
+import personal.leo.instabox.Constants;
 
 public class DownloaderService extends IntentService {
     private static final String ACTION_FOO = "personal.leo.instabox.action.FOO";

@@ -4,8 +4,14 @@
     <string name="notification_title">Now downloading…</string>
     <string name="notification_description">File Name:</string>
     <string name="empty_text">Copy Share Link From Instagram To Download Media</string>
-    <string name="title_activity_settings">Settings</string>
     <string name="allowed_non_wifi_to_download">Allow non-WIFI network to download</string>
     <string name="allowed_auto_download">Allow auto start downloading</string>
+    <string name="item_settings">Settings</string>
+    <string name="item_share">Share</string>
+    <string name="item_edit">Set Wallpaper</string>
 
+    <string name="title_activity_flipper">FlipperActivity</string>
+    <string name="share_title">Share To</string>
+    <string name="set_wallpaper">Set as wallpaper</string>
+    <string name="btn_download">Click To Download</string>
 </resources>

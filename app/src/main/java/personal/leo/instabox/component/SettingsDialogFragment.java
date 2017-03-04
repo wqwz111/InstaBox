@@ -1,20 +1,19 @@
-package personal.leo.instabox;
+package personal.leo.instabox.component;
 
+import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
-import android.support.v4.app.DialogFragment;
-import android.support.v7.app.AlertDialog;
 import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 
-/**
- * Created by leo on 17-2-24.
- */
+import personal.leo.instabox.R;
+
 
 public class SettingsDialogFragment extends DialogFragment {
     private static final String PREFERENCES_NAME = "settings";

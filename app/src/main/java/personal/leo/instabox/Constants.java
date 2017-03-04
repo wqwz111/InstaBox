@@ -1,8 +1,5 @@
 package personal.leo.instabox;
 
-/**
- * Created by leo on 17-2-21.
- */
 
 public final class Constants {
     public static final String BROADCAST_ACTION = "personal.leo.instabox.BROADCAST";

@@ -1,14 +1,17 @@
 package personal.leo.instabox;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.DownloadManager;
 import android.app.DownloadManager.Request;
+import android.app.LoaderManager;
 import android.content.BroadcastReceiver;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.Loader;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -16,38 +19,34 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.content.AsyncTaskLoader;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.Loader;
 import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.GridView;
-import android.widget.ProgressBar;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
+
+import personal.leo.instabox.component.SettingsDialogFragment;
+import personal.leo.instabox.service.DownloaderService;
 
 import static android.app.DownloadManager.Request.NETWORK_MOBILE;
 import static android.app.DownloadManager.Request.NETWORK_WIFI;
 
-public class MainActivity extends AppCompatActivity
+public class MainActivity extends Activity
         implements LoaderManager.LoaderCallbacks<File[]>,
         SettingsDialogFragment.SettingsDialogListener{
+    private Button mBtnDownload;
     private GridView mGridView;
-    private ProgressBar mProgressBar;
     private SharedPreferences mSettings;
     private ArrayList<Long> mDownloadIds = new ArrayList<>();
-    private static MediaAdapter mMediaAdapter;
 
+    private String mUrl;
+
+    private static MediaAdapter mMediaAdapter;
 
     private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 0;
 
@@ -59,7 +58,7 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mProgressBar = (ProgressBar) findViewById(R.id.pb_loading_media);
+        mBtnDownload = (Button) findViewById(R.id.btn_download);
         mGridView = (GridView) findViewById(R.id.gv_main);
         mMediaAdapter = new MediaAdapter(this);
         mGridView.setAdapter(mMediaAdapter);
@@ -68,16 +67,19 @@ public class MainActivity extends AppCompatActivity
         mSettings = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
         registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         LocalBroadcastManager.getInstance(this)
-                .registerReceiver(myReciver, new IntentFilter(Constants.BROADCAST_ACTION));
+                .registerReceiver(myReceiver, new IntentFilter(Constants.BROADCAST_ACTION));
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (hasPermission()) {
-            getSupportLoaderManager().initLoader(0, null, MainActivity.this);
+            getLoaderManager().initLoader(0, null, MainActivity.this);
+            mUrl = checkClipboard();
             if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
                 fetchRemoteMediaInfo();
+            } else if (!mUrl.isEmpty() && mUrl.matches("^https://www[.]instagram[.]com/p/.*/$")) {
+                mBtnDownload.setVisibility(View.VISIBLE);
             }
         } else {
             requestPermission();
@@ -86,7 +88,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     protected void onDestroy() {
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(myReciver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(myReceiver);
         unregisterReceiver(onComplete);
         super.onDestroy();
     }
@@ -102,6 +104,7 @@ public class MainActivity extends AppCompatActivity
         switch (item.getItemId()) {
             case R.id.menu_item_settings: {
                 showSettingsDialog();
+                break;
             }
         }
         return true;
@@ -122,24 +125,22 @@ public class MainActivity extends AppCompatActivity
 
     private void showSettingsDialog() {
         SettingsDialogFragment settingsDialogFragment = new SettingsDialogFragment();
-        settingsDialogFragment.show(getSupportFragmentManager(), "settings");
+        settingsDialogFragment.show(getFragmentManager(), "settings");
     }
 
     private boolean hasPermission() {
-        return !(ContextCompat.checkSelfPermission(MainActivity.this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(MainActivity.this,
-                Manifest.permission.READ_EXTERNAL_STORAGE)
+        return !(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED);
     }
 
     private void requestPermission() {
-        ActivityCompat.requestPermissions(MainActivity.this,
-                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+        requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                 PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
     }
 
-    private BroadcastReceiver myReciver = new BroadcastReceiver() {
+    private BroadcastReceiver myReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             ContentValues contentValues = intent.getParcelableExtra(Constants.MEDIA_INFO);
@@ -154,7 +155,10 @@ public class MainActivity extends AppCompatActivity
         public void onReceive(Context context, Intent intent) {
             long enqueueId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
             if (mDownloadIds.contains(enqueueId)) {
-                getSupportLoaderManager().getLoader(0).onContentChanged();
+                if (mBtnDownload.getVisibility() == View.VISIBLE) {
+                    mBtnDownload.setVisibility(View.GONE);
+                }
+                getLoaderManager().getLoader(0).onContentChanged();
             }
         }
     };
@@ -162,15 +166,8 @@ public class MainActivity extends AppCompatActivity
     private AdapterView.OnItemClickListener onItemClick = new AdapterView.OnItemClickListener() {
         @Override
         public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            File file = (File) adapterView.getItemAtPosition(i);
-            String filePath = file.getPath();
-            if (Utils.isVideo(filePath)) {
-                intent.setDataAndType(Uri.fromFile(new File(filePath)),
-                        "video/*");
-            } else {
-                intent.setDataAndType(Uri.fromFile(new File(filePath)), "image/*");
-            }
+            Intent intent = new Intent(MainActivity.this, FlipperActivity.class);
+            intent.putExtra("position", i);
             startActivity(intent);
         }
     };
@@ -213,24 +210,26 @@ public class MainActivity extends AppCompatActivity
         return result;
     }
 
-    private void fetchRemoteMediaInfo() {
+    private String checkClipboard() {
         ClipboardManager clipboardManager =
                 (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-        String url = clipboardManager.hasPrimaryClip() ?
+        return clipboardManager.hasPrimaryClip() ?
                 clipboardManager.getPrimaryClip().getItemAt(0).getText().toString() : "";
-        if (!url.isEmpty() && url.matches("^https://www[.]instagram[.]com/p/.*/$")) {
-            DownloaderService.startActionFoo(this, url);
+    }
+
+    private void fetchRemoteMediaInfo() {
+        if (!mUrl.isEmpty() && mUrl.matches("^https://www[.]instagram[.]com/p/.*/$")) {
+            DownloaderService.startActionFoo(this, mUrl);
         }
     }
 
     @Override
     public Loader<File[]> onCreateLoader(int id, Bundle args) {
-        return new MediaLoader(MainActivity.this, mProgressBar);
+        return new MediaLoader(MainActivity.this);
     }
 
     @Override
     public void onLoadFinished(Loader<File[]> loader, File[] data) {
-        mProgressBar.setVisibility(View.GONE);
         mMediaAdapter.clear();
         if (data == null || data.length == 0) {
             mGridView.setEmptyView(findViewById(R.id.tv_empty));
@@ -252,58 +251,7 @@ public class MainActivity extends AppCompatActivity
         editor.apply();
     }
 
-    public void onFabDownloadClick(View view) {
+    public void onDownloadBtnClick(View view) {
         fetchRemoteMediaInfo();
-    }
-
-    static class MediaLoader extends AsyncTaskLoader<File[]> {
-
-        private ProgressBar mProgressBar;
-
-        MediaLoader(Context context, ProgressBar progressBar) {
-            super(context);
-            mProgressBar = progressBar;
-        }
-
-        @Override
-        protected void onStartLoading() {
-            mProgressBar.setVisibility(View.VISIBLE);
-            forceLoad();
-        }
-
-        @Override
-        protected void onStopLoading() {
-            cancelLoad();
-        }
-
-        @Override
-        public File[] loadInBackground() {
-            File[] files = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    .listFiles(new FilenameFilter() {
-                        @Override
-                        public boolean accept(File file, String s) {
-                            return s.toLowerCase().contains(Constants.FILE_PREFIX);
-                        }
-                    });
-            if (files != null && files.length != 0) {
-                sortFilesByLastModifiedTime(files);
-            }
-            return files;
-        }
-
-        private void sortFilesByLastModifiedTime(File[] files) {
-            Arrays.sort(files, new Comparator<File>() {
-                @Override
-                public int compare(File lhs, File rhs) {
-                    if (lhs.lastModified() < rhs.lastModified()) {
-                        return -1;
-                    } else if (lhs.lastModified() > rhs.lastModified()) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-                }
-            });
-        }
     }
 }

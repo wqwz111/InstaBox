@@ -3,6 +3,10 @@
     <color name="colorPrimary">#AED581</color>
     <color name="colorPrimaryDark">#9CCC65</color>
     <color name="colorAccent">#F44336</color>
-    <color name="empty_text_color">#4a4a4a</color>
+    <color name="empty_text_color">#757575</color>
     <color name="divid_line_color">#4d4d4d</color>
+
+    <color name="black_overlay">#66000000</color>
+    <color name="color_btn_download">#88000000</color>
+    <color name="color_btn_download_text">#FFFFFF</color>
 </resources>

@@ -12,9 +12,6 @@ import com.bumptech.glide.Glide;
 
 import java.io.File;
 
-/**
- * Created by leo on 17-2-23.
- */
 
 class MediaAdapter extends ArrayAdapter<File> {
 

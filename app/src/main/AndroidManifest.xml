@@ -3,6 +3,7 @@
     package="personal.leo.instabox">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
@@ -21,8 +22,12 @@
         </activity>
 
         <service
-            android:name=".DownloaderService"
+            android:name=".service.DownloaderService"
             android:exported="false" />
+
+        <activity
+            android:name=".FlipperActivity"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>
