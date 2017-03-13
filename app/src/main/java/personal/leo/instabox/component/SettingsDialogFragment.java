@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.Switch;
@@ -40,7 +39,6 @@ public class SettingsDialogFragment extends DialogFragment {
         }
     }
 
-    @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         SharedPreferences settings = getActivity().getSharedPreferences(PREFERENCES_NAME,

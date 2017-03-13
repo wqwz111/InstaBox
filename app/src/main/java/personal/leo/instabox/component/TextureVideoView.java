@@ -6,10 +6,8 @@ import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.media.AudioManager;
 import android.media.MediaExtractor;
-import android.media.MediaFormat;
 import android.media.MediaPlayer;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -28,7 +26,6 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         MediaPlayer.OnInfoListener,
         MediaPlayer.OnBufferingUpdateListener,
         TextureView.SurfaceTextureListener {
-    private static final String TAG = "TextureVideoView";
 
     private volatile int mCurrentState = STATE_IDLE;
     private volatile int mTargetState = STATE_IDLE;
@@ -42,10 +39,6 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
     private static final int MSG_START = 100;
     private static final int MSG_PAUSE = 110;
     private static final int MSG_STOP = 111;
-
-
-    private int mVideoWidth;
-    private int mVideoHeight;
 
     private Uri mUri;
     private Context mContext;
@@ -229,22 +222,11 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
             mTargetState = STATE_PREPARING;
 
             mHasAudio = true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                try {
-                    MediaExtractor mediaExtractor = new MediaExtractor();
-                    mediaExtractor.setDataSource(mContext, mUri, null);
-                    MediaFormat format;
-                    for (int i = 0; i < mediaExtractor.getTrackCount(); i++) {
-                        format = mediaExtractor.getTrackFormat(i);
-                        String mime = format.getString(MediaFormat.KEY_MIME);
-                        if (mime.startsWith("audio/")) {
-                            mHasAudio = true;
-                            break;
-                        }
-                    }
-                } catch (Exception ex) {
-                    // may be failed to instantiate extractor.
-                }
+            try {
+                MediaExtractor mediaExtractor = new MediaExtractor();
+                mediaExtractor.setDataSource(mContext, mUri, null);
+            } catch (Exception ex) {
+                // may be failed to instantiate extractor.
             }
 
         } catch (IOException | IllegalArgumentException ex) {
@@ -254,9 +236,8 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (mMediaPlayerCallback != null) {
-                            mMediaPlayerCallback.onError(mMediaPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
-                        }
+                        mMediaPlayerCallback.onError(mMediaPlayer,
+                                MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
                     }
                 });
             }

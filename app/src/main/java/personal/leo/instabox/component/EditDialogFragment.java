@@ -11,7 +11,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.support.annotation.NonNull;
 import android.view.View;
 import android.widget.TextView;
 
@@ -32,7 +31,6 @@ public class EditDialogFragment extends DialogFragment {
         mWallpaperManager = WallpaperManager.getInstance(context);
     }
 
-    @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
 

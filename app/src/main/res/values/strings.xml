@@ -10,7 +10,6 @@
     <string name="item_share">Share</string>
     <string name="item_edit">Set Wallpaper</string>
 
-    <string name="title_activity_flipper">FlipperActivity</string>
     <string name="share_title">Share To</string>
     <string name="set_wallpaper">Set as wallpaper</string>
     <string name="btn_download">Click To Download</string>

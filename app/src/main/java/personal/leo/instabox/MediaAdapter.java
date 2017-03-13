@@ -36,14 +36,12 @@ class MediaAdapter extends ArrayAdapter<File> {
         File file = getItem(position);
 
         if (file != null) {
-            int visibility;
             Glide.with(getContext()).load(file).into(viewHolder.thumbnail);
             if (Utils.isVideo(file.getPath())) {
-                visibility = View.VISIBLE;
+                viewHolder.playIcon.setVisibility(View.VISIBLE);
             } else {
-                visibility = View.INVISIBLE;
+                viewHolder.playIcon.setVisibility(View.INVISIBLE);
             }
-            viewHolder.playIcon.setVisibility(visibility);
         }
         return convertView;
     }

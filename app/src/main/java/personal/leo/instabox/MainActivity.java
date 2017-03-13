@@ -111,8 +111,7 @@ public class MainActivity extends Activity
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         if (requestCode == PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE) {
             if ((grantResults.length > 0
