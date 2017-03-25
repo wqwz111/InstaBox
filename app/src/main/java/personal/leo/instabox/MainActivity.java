@@ -183,8 +183,7 @@ public class MainActivity extends Activity
         public void onScrollStateChanged(AbsListView absListView, int i) {
             if (i == SCROLL_STATE_IDLE && mShouldShowDownloadBtn) {
                 mBtnDownload.setVisibility(View.VISIBLE);
-            } else {
-                if (mBtnDownload.getVisibility() == View.INVISIBLE) ;
+            } else if (mBtnDownload.getVisibility() != View.INVISIBLE) {
                 mBtnDownload.setVisibility(View.INVISIBLE);
             }
         }
