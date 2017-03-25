@@ -6,6 +6,7 @@ import android.app.DownloadManager;
 import android.app.DownloadManager.Request;
 import android.app.LoaderManager;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
@@ -23,6 +24,7 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.GridView;
@@ -45,6 +47,7 @@ public class MainActivity extends Activity
     private ArrayList<Long> mDownloadIds = new ArrayList<>();
 
     private String mUrl;
+    private boolean mShouldShowDownloadBtn;
 
     private static MediaAdapter mMediaAdapter;
 
@@ -63,6 +66,7 @@ public class MainActivity extends Activity
         mMediaAdapter = new MediaAdapter(this);
         mGridView.setAdapter(mMediaAdapter);
         mGridView.setOnItemClickListener(onItemClick);
+        mGridView.setOnScrollListener(onScollListener);
 
         mSettings = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
         registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
@@ -79,6 +83,7 @@ public class MainActivity extends Activity
             if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
                 fetchRemoteMediaInfo();
             } else if (!mUrl.isEmpty() && mUrl.matches("^https://www[.]instagram[.]com/p/.*/$")) {
+                mShouldShowDownloadBtn = true;
                 mBtnDownload.setVisibility(View.VISIBLE);
             }
         } else {
@@ -154,8 +159,10 @@ public class MainActivity extends Activity
         public void onReceive(Context context, Intent intent) {
             long enqueueId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
             if (mDownloadIds.contains(enqueueId)) {
+                clearClipboard();
+                mShouldShowDownloadBtn = false;
                 if (mBtnDownload.getVisibility() == View.VISIBLE) {
-                    mBtnDownload.setVisibility(View.GONE);
+                    mBtnDownload.setVisibility(View.INVISIBLE);
                 }
                 getLoaderManager().getLoader(0).onContentChanged();
             }
@@ -168,6 +175,23 @@ public class MainActivity extends Activity
             Intent intent = new Intent(MainActivity.this, FlipperActivity.class);
             intent.putExtra("position", i);
             startActivity(intent);
+        }
+    };
+
+    private AbsListView.OnScrollListener onScollListener = new AbsListView.OnScrollListener() {
+        @Override
+        public void onScrollStateChanged(AbsListView absListView, int i) {
+            if (i == SCROLL_STATE_IDLE && mShouldShowDownloadBtn) {
+                mBtnDownload.setVisibility(View.VISIBLE);
+            } else {
+                if (mBtnDownload.getVisibility() == View.INVISIBLE) ;
+                mBtnDownload.setVisibility(View.INVISIBLE);
+            }
+        }
+
+        @Override
+        public void onScroll(AbsListView absListView, int i, int i1, int i2) {
+
         }
     };
 
@@ -214,6 +238,12 @@ public class MainActivity extends Activity
                 (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
         return clipboardManager.hasPrimaryClip() ?
                 clipboardManager.getPrimaryClip().getItemAt(0).getText().toString() : "";
+    }
+
+    private void clearClipboard() {
+        ClipboardManager clipboardManager =
+                (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        clipboardManager.setPrimaryClip(ClipData.newPlainText("", ""));
     }
 
     private void fetchRemoteMediaInfo() {
