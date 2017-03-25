@@ -9,16 +9,14 @@ import android.media.MediaExtractor;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
-import android.os.Message;
 import android.util.AttributeSet;
 import android.view.Surface;
 import android.view.TextureView;
 
 import java.io.IOException;
 
-public class TextureVideoView extends TextureView implements Handler.Callback,
+public class TextureVideoView extends TextureView implements
         MediaPlayer.OnPreparedListener,
         MediaPlayer.OnVideoSizeChangedListener,
         MediaPlayer.OnCompletionListener,
@@ -36,9 +34,6 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
     private static final int STATE_PLAYING = 3;
     private static final int STATE_PAUSED = 4;
     private static final int STATE_PLAYBACK_COMPLETED = 5;
-    private static final int MSG_START = 100;
-    private static final int MSG_PAUSE = 110;
-    private static final int MSG_STOP = 111;
 
     private Uri mUri;
     private Context mContext;
@@ -47,14 +42,7 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
     private AudioManager mAudioManager;
     private MediaPlayerCallback mMediaPlayerCallback;
     private Handler mHandler;
-    private Handler mVideoHandler;
     private boolean mHasAudio;
-
-    private static final HandlerThread sThread = new HandlerThread("Thread_pv");
-
-    static {
-        sThread.start();
-    }
 
     public interface MediaPlayerCallback {
         void onPrepared(MediaPlayer mp);
@@ -129,48 +117,12 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         return -1;
     }
 
-    public int getVideoHeight() {
-        if (mMediaPlayer != null) {
-            return mMediaPlayer.getVideoHeight();
-        }
-        return 0;
-    }
-
-    public int getVideoWidth() {
-        if (mMediaPlayer != null) {
-            return mMediaPlayer.getVideoWidth();
-        }
-        return 0;
-    }
-
-    @Override
-    public boolean handleMessage(Message msg) {
-        synchronized (TextureVideoView.class) {
-            switch (msg.what) {
-                case MSG_START:
-                    openVideo();
-                    break;
-                case MSG_PAUSE:
-                    if (mMediaPlayer != null) {
-                        mMediaPlayer.pause();
-                    }
-                    mCurrentState = STATE_PAUSED;
-                    break;
-                case MSG_STOP:
-                    release(true);
-                    break;
-            }
-        }
-        return true;
-    }
-
     private void init() {
         if (!isInEditMode()) {
             mContext = getContext();
             mCurrentState = STATE_IDLE;
             mTargetState = STATE_IDLE;
             mHandler = new Handler();
-            mVideoHandler = new Handler(sThread.getLooper(), this);
             setSurfaceTextureListener(this);
         }
     }
@@ -281,11 +233,11 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         mTargetState = STATE_PLAYING;
 
         if (isInPlaybackState()) {
-            mVideoHandler.obtainMessage(MSG_STOP).sendToTarget();
+            release(true);
         }
 
         if (mUri != null && mSurface != null) {
-            mVideoHandler.obtainMessage(MSG_START).sendToTarget();
+            openVideo();
         }
     }
 
@@ -293,7 +245,10 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         mTargetState = STATE_PAUSED;
 
         if (isPlaying()) {
-            mVideoHandler.obtainMessage(MSG_PAUSE).sendToTarget();
+            if (mMediaPlayer != null) {
+                mMediaPlayer.pause();
+            }
+            mCurrentState = STATE_PAUSED;
         }
     }
 
@@ -301,7 +256,7 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         mTargetState = STATE_PLAYING;
 
         if (!isPlaying()) {
-            mVideoHandler.obtainMessage(MSG_START).sendToTarget();
+            openVideo();
         }
     }
 
@@ -309,7 +264,7 @@ public class TextureVideoView extends TextureView implements Handler.Callback,
         mTargetState = STATE_PLAYBACK_COMPLETED;
 
         if (isInPlaybackState()) {
-            mVideoHandler.obtainMessage(MSG_STOP).sendToTarget();
+            release(true);
         }
     }
 
