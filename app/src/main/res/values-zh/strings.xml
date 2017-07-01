@@ -12,4 +12,6 @@
     <string name="item_share">分享</string>
     <string name="item_edit">设置壁纸</string>
     <string name="btn_download">开始下载</string>
+    <string name="foreground_description">复制分享链接以下载</string>
+    <string name="notification_stop">停止</string>
 </resources>

@@ -13,4 +13,7 @@
     <string name="share_title">Share To</string>
     <string name="set_wallpaper">Set as wallpaper</string>
     <string name="btn_download">Click To Download</string>
+
+    <string name="foreground_description">Copy Share Link To Download</string>
+    <string name="notification_stop">Stop</string>
 </resources>
