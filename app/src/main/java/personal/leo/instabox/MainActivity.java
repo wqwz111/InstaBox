@@ -2,57 +2,87 @@ package personal.leo.instabox;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.app.DownloadManager.Request;
 import android.app.LoaderManager;
 import android.content.BroadcastReceiver;
 import android.content.ClipboardManager;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.Loader;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.GridView;
 
 import java.io.File;
-import java.util.ArrayList;
 
 import personal.leo.instabox.component.SettingsDialogFragment;
 import personal.leo.instabox.service.DownloaderService;
-
-import static android.app.DownloadManager.Request.NETWORK_MOBILE;
-import static android.app.DownloadManager.Request.NETWORK_WIFI;
+import personal.leo.instabox.service.ForegroundService;
 
 public class MainActivity extends Activity
         implements LoaderManager.LoaderCallbacks<File[]>,
         SettingsDialogFragment.SettingsDialogListener{
-    private Button mBtnDownload;
-    private GridView mGridView;
-    private SharedPreferences mSettings;
-    private ArrayList<Long> mDownloadIds = new ArrayList<>();
-
-    private String mUrl;
-
-    private static MediaAdapter mMediaAdapter;
-
     private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 0;
-
     private static final String PREFERENCES_NAME = "settings";
     private static final String PREF_KEY_NETWORK = "network";
     private static final String PREF_KEY_AUTO_DOWNLOAD = "auto_download";
+    private static MediaAdapter mMediaAdapter;
+    private Button mBtnDownload;
+    private GridView mGridView;
+    private SharedPreferences mSettings;
+    private String mUrl;
+    private boolean mShouldShowDownloadBtn;
+    private BroadcastReceiver myReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            mShouldShowDownloadBtn = false;
+            if (mBtnDownload.getVisibility() == View.VISIBLE) {
+                mBtnDownload.setVisibility(View.INVISIBLE);
+            }
+            getLoaderManager().getLoader(0).onContentChanged();
+        }
+    };
+    private BroadcastReceiver myReceiver2 = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            mShouldShowDownloadBtn = true;
+            if (mBtnDownload.getVisibility() == View.INVISIBLE) {
+                mBtnDownload.setVisibility(View.VISIBLE);
+            }
+        }
+    };
+    private AdapterView.OnItemClickListener onItemClick = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+            Intent intent = new Intent(MainActivity.this, FlipperActivity.class);
+            intent.putExtra("position", i);
+            startActivity(intent);
+        }
+    };
+    private AbsListView.OnScrollListener onScollListener = new AbsListView.OnScrollListener() {
+        @Override
+        public void onScrollStateChanged(AbsListView absListView, int i) {
+            if (i == SCROLL_STATE_IDLE && mShouldShowDownloadBtn) {
+                mBtnDownload.setVisibility(View.VISIBLE);
+            } else if (mBtnDownload.getVisibility() != View.INVISIBLE) {
+                mBtnDownload.setVisibility(View.INVISIBLE);
+            }
+        }
+
+        @Override
+        public void onScroll(AbsListView absListView, int i, int i1, int i2) {
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,11 +93,17 @@ public class MainActivity extends Activity
         mMediaAdapter = new MediaAdapter(this);
         mGridView.setAdapter(mMediaAdapter);
         mGridView.setOnItemClickListener(onItemClick);
+        mGridView.setOnScrollListener(onScollListener);
 
         mSettings = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE);
-        registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         LocalBroadcastManager.getInstance(this)
-                .registerReceiver(myReceiver, new IntentFilter(Constants.BROADCAST_ACTION));
+                .registerReceiver(myReceiver,
+                        new IntentFilter(Constants.BROADCAST_ACTION_RELOAD_MEDIA));
+        LocalBroadcastManager.getInstance(this)
+                .registerReceiver(myReceiver2,
+                        new IntentFilter(Constants.BROADCAST_ACTION_SHOW_DOWNLOAD_BUTTON));
+        Intent intent = new Intent(MainActivity.this, ForegroundService.class);
+        startService(intent);
     }
 
     @Override
@@ -79,6 +115,7 @@ public class MainActivity extends Activity
             if (mSettings.getBoolean(PREF_KEY_AUTO_DOWNLOAD, true)) {
                 fetchRemoteMediaInfo();
             } else if (!mUrl.isEmpty() && mUrl.matches("^https://www[.]instagram[.]com/p/.*/$")) {
+                mShouldShowDownloadBtn = true;
                 mBtnDownload.setVisibility(View.VISIBLE);
             }
         } else {
@@ -88,8 +125,9 @@ public class MainActivity extends Activity
 
     @Override
     protected void onDestroy() {
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(myReceiver);
-        unregisterReceiver(onComplete);
+        LocalBroadcastManager manager = LocalBroadcastManager.getInstance(this);
+        manager.unregisterReceiver(myReceiver);
+        manager.unregisterReceiver(myReceiver2);
         super.onDestroy();
     }
 
@@ -137,76 +175,6 @@ public class MainActivity extends Activity
     private void requestPermission() {
         requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                 PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
-    }
-
-    private BroadcastReceiver myReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            ContentValues contentValues = intent.getParcelableExtra(Constants.MEDIA_INFO);
-            String mediaUrl = contentValues.getAsString(Constants.MEDIA_URL);
-            String mediaName = contentValues.getAsString(Constants.MEDIA_NAME);
-            download(mediaUrl, mediaName);
-        }
-    };
-
-    private BroadcastReceiver onComplete = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            long enqueueId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-            if (mDownloadIds.contains(enqueueId)) {
-                if (mBtnDownload.getVisibility() == View.VISIBLE) {
-                    mBtnDownload.setVisibility(View.GONE);
-                }
-                getLoaderManager().getLoader(0).onContentChanged();
-            }
-        }
-    };
-
-    private AdapterView.OnItemClickListener onItemClick = new AdapterView.OnItemClickListener() {
-        @Override
-        public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-            Intent intent = new Intent(MainActivity.this, FlipperActivity.class);
-            intent.putExtra("position", i);
-            startActivity(intent);
-        }
-    };
-
-    private void download(String url, String fileName) {
-        DownloadManager mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        if (!doesRequestExist(mDownloadManager, url)) {
-            boolean allowedOverMetered = mSettings.getBoolean(PREF_KEY_NETWORK, true);
-            int networkType = NETWORK_WIFI;
-            if (allowedOverMetered) {
-                networkType = NETWORK_WIFI | NETWORK_MOBILE;
-            }
-            Request request = new Request(Uri.parse(url));
-            request.setTitle(fileName);
-            request.setNotificationVisibility(Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-            request.setAllowedNetworkTypes(networkType);
-
-            long id = mDownloadManager.enqueue(request);
-            mDownloadIds.add(id);
-        }
-    }
-
-    private boolean doesRequestExist(DownloadManager downloadManager, String url) {
-        boolean result = false;
-        DownloadManager.Query query = new DownloadManager.Query();
-        query.setFilterByStatus(DownloadManager.STATUS_SUCCESSFUL
-            | DownloadManager.STATUS_PENDING
-            | DownloadManager.STATUS_RUNNING);
-        Cursor cursor = downloadManager.query(query);
-        while (cursor.moveToNext()) {
-            int uriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_URI);
-            String uri = cursor.getString(uriIndex);
-            if (uri.equals(url)) {
-                result = true;
-                break;
-            }
-        }
-        cursor.close();
-        return result;
     }
 
     private String checkClipboard() {
